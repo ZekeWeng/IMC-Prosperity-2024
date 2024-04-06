@@ -36,5 +36,5 @@ class Trader:
         traderData = "SAMPLE"
 
         # Sample conversion request. Check more details below.
-        conversions = 1
+        conversions = 0
         return result, conversions, traderData
