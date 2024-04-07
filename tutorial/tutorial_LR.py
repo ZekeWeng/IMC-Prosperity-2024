@@ -35,10 +35,8 @@ class Trader:
                 Trader.PRODUCTS[product]["DATA"].append(statistics.mean([Trader.weighted_average_price(order_depth.buy_orders), Trader.weighted_average_price(order_depth.sell_orders)]))
                 Trader.PRODUCTS[product]["TIME"].append(time)
 
-            print("Median price: " + str(statistics.mean([list(order_depth.buy_orders.items())[0][0], list(order_depth.sell_orders.items())[0][0]])))
-            print("WA price: " + str(Trader.weighted_average_price(order_depth.buy_orders)))
-
             print("Acceptable price : " + str(Trader.PRODUCTS[product]["PRICE"]))
+            print("Current Quantity: " + str(Trader.PRODUCTS[product]["QUANTITY"]))
             print("Buy Order depth : " + str(len(order_depth.buy_orders)) + ", Sell order depth : " + str(len(order_depth.sell_orders)))
 
             ### BUY ORDERS
@@ -62,16 +60,21 @@ class Trader:
         traderData = "SAMPLE" # ID TEAM???
 
         # Sample conversion request. Check more details below.
-        # FIGURE THIS OUT LATER
         conversions = 1
         return result, conversions, traderData
 
     def submit_order(product, action, price, quantity):
-        order_quantity = min(abs(quantity), Trader.PRODUCTS[product]["PLIMIT"])
-        print(action, str(order_quantity) + "x", price)
+        can_buy = Trader.PRODUCTS[product]["PLIMIT"] - Trader.PRODUCTS[product]["QUANTITY"]
+        can_sell = Trader.PRODUCTS[product]["QUANTITY"] + Trader.PRODUCTS[product]["PLIMIT"]
         if action == "BUY":
+            order_quantity = min(abs(quantity), can_buy)
+            print(action, str(order_quantity) + "x", price)
+            Trader.PRODUCTS[product]["QUANTITY"] = Trader.PRODUCTS[product]["QUANTITY"] + order_quantity
             return Order(product, price, order_quantity)
         if action == "SELL":
+            order_quantity = min(abs(quantity), can_sell)
+            print(action, str(order_quantity) + "x", price)
+            Trader.PRODUCTS[product]["QUANTITY"] = Trader.PRODUCTS[product]["QUANTITY"] - order_quantity
             return Order(product, price, -order_quantity)
 
     def compute_price_regression(product, time):
