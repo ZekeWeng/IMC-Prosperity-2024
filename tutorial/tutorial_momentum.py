@@ -8,11 +8,11 @@ import math
 class Trader:
 
     PRODUCTS = {
-        'STARFRUIT': {"QUANTITY": 0, "TIME": [], "DATA": [], "PRICE": 0, "LR_SIZE": 10, "PLIMIT": 20, "PNL": 0},
-        'AMETHYSTS': {"QUANTITY": 0, "TIME": [], "DATA": [], "PRICE": 0, "LR_SIZE": 10, "PLIMIT": 20, "PNL": 0}
+        'STARFRUIT': {"TIME": [], "DATA": [], "DELTAS": [0], "QUANTITY": 0, "PRICE": 0, "PLIMIT": 20, "STRATEGY": "LR", "LR_SIZE": 5},
+        'AMETHYSTS': {"TIME": [], "DATA": [], "DELTAS": [0], "QUANTITY": 0, "PRICE": 0, "PLIMIT": 20, "STRATEGY": "LR", "LR_SIZE": 5}
         }
 
-    CURRENT_STRATEGY = "LR"
+    strategies = ["LR", "PT", ]
 
     def run(self, state: TradingState):
 
@@ -32,38 +32,42 @@ class Trader:
             if len(Trader.PRODUCTS[product]["TIME"]) > Trader.PRODUCTS[product]["LR_SIZE"]:
                 Trader.PRODUCTS[product]["PRICE"] = Trader.compute_price_regression(product, time)
 
-            ### Store prices + quantities
-            if len(order_depth.buy_orders) != 0 and len(order_depth.sell_orders) != 0:
-                Trader.PRODUCTS[product]["DATA"].append(statistics.mean([Trader.weighted_average_price(order_depth.buy_orders), Trader.weighted_average_price(order_depth.sell_orders)]))
-                Trader.PRODUCTS[product]["TIME"].append(time)
-
             print("Acceptable price : " + str(Trader.PRODUCTS[product]["PRICE"]))
             print("Current Quantity: " + str(Trader.PRODUCTS[product]["QUANTITY"]))
             print("Buy Order depth : " + str(len(order_depth.buy_orders)) + ", Sell order depth : " + str(len(order_depth.sell_orders)))
+            print("Current Strategy: " + str(Trader.PRODUCTS[product]["STRATEGY"]))
+            print("Current Delta: " + str(Trader.PRODUCTS[product]["DELTAS"][-1]))
 
-            ### BUY ORDERS
-            if len(order_depth.sell_orders) != 0:
-                ask, ask_amount = list(order_depth.sell_orders.items())[0]
-                if int(ask) < Trader.PRODUCTS[product]["PRICE"] and time > Trader.PRODUCTS[product]["LR_SIZE"] * 100:
-                    order = Trader.submit_order(product, "BUY", ask, ask_amount)
-                    orders.append(order)
+            if Trader.PRODUCTS[product]["STRATEGY"] == "LR" and time > Trader.PRODUCTS[product]["LR_SIZE"] * 100 and Trader.PRODUCTS[product]["STRATEGY"] in Trader.strategies:
+                ### BUY ORDERS
+                if len(order_depth.sell_orders) != 0:
+                    ask, ask_amount = list(order_depth.sell_orders.items())[0]
+                    if int(ask) < Trader.PRODUCTS[product]["PRICE"]:
+                        order = Trader.submit_order(product, "BUY", ask, ask_amount)
+                        orders.append(order)
 
-            ### SELL ORDERS
-            if len(order_depth.buy_orders) != 0:
-                bid, bid_amount = list(order_depth.buy_orders.items())[0]
-                if int(bid) > Trader.PRODUCTS[product]["PRICE"] and time > Trader.PRODUCTS[product]["LR_SIZE"] * 100:
-                    order = Trader.submit_order(product, "SELL", bid, bid_amount)
-                    orders.append(order)
+                ### SELL ORDERS
+                if len(order_depth.buy_orders) != 0:
+                    bid, bid_amount = list(order_depth.buy_orders.items())[0]
+                    if int(bid) > Trader.PRODUCTS[product]["PRICE"]:
+                        order = Trader.submit_order(product, "SELL", bid, bid_amount)
+                        orders.append(order)
 
-            Trader.compute_momentum(product, 2, order_depth)
+            # Trader.compute_momentum(product, 0.5, order_depth)
 
-            print(Trader.CURRENT_STRATEGY)
+            ### Store prices + quantities
+            if len(order_depth.buy_orders) != 0 and len(order_depth.sell_orders) != 0:
+                observed_price = statistics.mean([Trader.weighted_average_price(order_depth.buy_orders), Trader.weighted_average_price(order_depth.sell_orders)])
+                if len(Trader.PRODUCTS[product]["DATA"]) > 0:
+                    Trader.PRODUCTS[product]["DELTAS"].append(Trader.PRODUCTS[product]["DATA"][-1] - observed_price)
+                Trader.PRODUCTS[product]["DATA"].append(observed_price)
+                Trader.PRODUCTS[product]["TIME"].append(time)
 
             result[product] = orders
 
         # String value holding Trader state data required.
         # It will be delivered as TradingState.traderData on next execution.
-        traderData = "SAMPLE" # ID TEAM???
+        traderData = "SAMPLE"
 
         # Sample conversion request. Check more details below.
         conversions = 1
@@ -95,78 +99,44 @@ class Trader:
 
         return time * slope + intercept
 
-    def compute_momentum(product, threshold, order_depth):
-        X = np.array(Trader.PRODUCTS[product]["TIME"][-5:])
-        y = np.array(Trader.PRODUCTS[product]["DATA"][-5:])
+    # def compute_momentum(product, threshold, order_depth):
+    #     data = np.array(Trader.PRODUCTS[product]["DELTAS"][-10:])
 
-        X = X[:, np.newaxis]
-        X = np.hstack([np.ones_like(X), X])
+    #     indicator = np.mean(data)
+    #     current_std = np.std(data)
 
-        coefficients, _residuals, _rank, _s = np.linalg.lstsq(X, y, rcond=None)
-        _intercept, slope = coefficients
+    #     print(indicator)
 
-        if Trader.CURRENT_STRATEGY == "LR":
-            if slope > threshold and Trader.PRODUCTS[product]["QUANTITY"] < Trader.PRODUCTS[product]["PLIMIT"]:
+    #     if Trader.PRODUCTS[product]["STRATEGY"] == "LR":
+    #         if indicator > threshold and Trader.PRODUCTS[product]["QUANTITY"] < Trader.PRODUCTS[product]["PLIMIT"]:
+    #             Trader.solidify(product, order_depth)
+    #             Trader.PRODUCTS[product]["STRATEGY"]  = "CALL"
 
-                print("START CALL")
+    #         if indicator < -threshold and Trader.PRODUCTS[product]["QUANTITY"] < Trader.PRODUCTS[product]["PLIMIT"]:
+    #             Trader.liquidate(product, order_depth)
+    #             Trader.PRODUCTS[product]["STRATEGY"]  = "PUT"
 
-                ask, ask_amount = list(order_depth.sell_orders.items())[0]
-                ask2, ask_amount2 = list(order_depth.sell_orders.items())[1]
-                ask3, ask_amount3 = list(order_depth.sell_orders.items())[2]
-                Trader.submit_order(product, "BUY", ask, ask_amount)
-                if Trader.PRODUCTS[product]["QUANTITY"] < Trader.PRODUCTS[product]["PLIMIT"] and ask2 and ask_amount2:
-                    Trader.submit_order(product, "BUY", ask2, ask_amount2)
-                    if Trader.PRODUCTS[product]["QUANTITY"] < Trader.PRODUCTS[product]["PLIMIT"] and ask3 and ask_amount3:
-                        Trader.submit_order(product, "BUY", ask3, ask_amount3)
-                Trader.CURRENT_STRATEGY = "CALL"
+    #     elif Trader.PRODUCTS[product]["STRATEGY"] == "CALL" and indicator < 0.35:
+    #         Trader.liquidate(product, order_depth)
+    #         Trader.PRODUCTS[product]["STRATEGY"] = "LR"
 
-            if slope < -threshold and Trader.PRODUCTS[product]["QUANTITY"] < Trader.PRODUCTS[product]["PLIMIT"]:
+    #     elif Trader.PRODUCTS[product]["STRATEGY"] == "PUT" and indicator > -0.35:
+    #         Trader.solidify(product, order_depth)
+    #         Trader.PRODUCTS[product]["STRATEGY"] = "LR"
 
-                print("START PUT")
-
-                bid, bid_amount = list(order_depth.buy_orders.items())[0]
-                bid2, bid_amount2 = list(order_depth.buy_orders.items())[1]
-                bid3, bid_amount3 = list(order_depth.buy_orders.items())[2]
-                Trader.submit_order(product, "SELL", bid, bid_amount)
-                if Trader.PRODUCTS[product]["QUANTITY"] < Trader.PRODUCTS[product]["PLIMIT"] and bid2 and bid_amount2:
-                    Trader.submit_order(product, "SELL", bid2, bid_amount2)
-                    if Trader.PRODUCTS[product]["QUANTITY"] < Trader.PRODUCTS[product]["PLIMIT"] and bid3 and bid_amount3:
-                        Trader.submit_order(product, "SELL", bid3, bid_amount3)
-                Trader.CURRENT_STRATEGY = "PUT"
-
-        elif Trader.CURRENT_STRATEGY == "CALL" and slope < 0.25:
-
-            print("END CALL")
-
-            bid, bid_amount = list(order_depth.buy_orders.items())[0]
-            bid2, bid_amount2 = list(order_depth.buy_orders.items())[1]
-            bid3, bid_amount3 = list(order_depth.buy_orders.items())[2]
+    def liquidate(product, order_depth):                                                            # SELL EVERYTHING
+        for depth in range(0, len(order_depth.buy_orders)):
+            if Trader.PRODUCTS[product]["QUANTITY"] <= -Trader.PRODUCTS[product]["PLIMIT"]:
+                break
+            bid, bid_amount = list(order_depth.buy_orders.items())[depth]
             Trader.submit_order(product, "SELL", bid, bid_amount)
-            if Trader.PRODUCTS[product]["QUANTITY"] < Trader.PRODUCTS[product]["PLIMIT"] and bid2 and bid_amount2:
-                Trader.submit_order(product, "SELL", bid2, bid_amount2)
-                if Trader.PRODUCTS[product]["QUANTITY"] < Trader.PRODUCTS[product]["PLIMIT"] and bid3 and bid_amount3:
-                    Trader.submit_order(product, "SELL", bid3, bid_amount3)
-            Trader.CURRENT_STRATEGY = "LR"
 
-        elif Trader.CURRENT_STRATEGY == "PUT" and slope > -0.25:
-
-            print("END PUT")
-
-            ask, ask_amount = list(order_depth.sell_orders.items())[0]
-            ask2, ask_amount2 = list(order_depth.sell_orders.items())[1]
-            ask3, ask_amount3 = list(order_depth.sell_orders.items())[2]
+    def solidify(product, order_depth):                                                             # BUY EVERYTHING
+        for depth in range(0, len(order_depth.sell_orders)):
+            if Trader.PRODUCTS[product]["QUANTITY"] >= Trader.PRODUCTS[product]["PLIMIT"]:
+                break
+            ask, ask_amount = list(order_depth.sell_orders.items())[depth]
             Trader.submit_order(product, "BUY", ask, ask_amount)
-            if Trader.PRODUCTS[product]["QUANTITY"] < Trader.PRODUCTS[product]["PLIMIT"] and ask2 and ask_amount2:
-                Trader.submit_order(product, "BUY", ask2, ask_amount2)
-                if Trader.PRODUCTS[product]["QUANTITY"] < Trader.PRODUCTS[product]["PLIMIT"] and ask3 and ask_amount3:
-                    Trader.submit_order(product, "BUY", ask3, ask_amount3)
-            Trader.CURRENT_STRATEGY = "LR"
-
-
-
-
-    def compute_momentum():
-        pass
 
     def weighted_average_price(price_quantity_dict):
         total_quantity = sum(price_quantity_dict.values())
