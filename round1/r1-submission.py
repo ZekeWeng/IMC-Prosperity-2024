@@ -7,7 +7,7 @@ class Trader:
 
     PRODUCTS = {
         'AMETHYSTS': {"TIME": [], "DATA": [], "DELTAS": [0], "PRICE": 0, "PLIMIT": 20, "STRATEGY": "LR", "LR_SIZE": 9},
-        'STARFRUIT': {"TIME": [], "DATA": [], "DELTAS": [0], "PRICE": 0, "PLIMIT": 20, "STRATEGY": "LR", "LR_SIZE": 9}
+        'STARFRUIT': {"TIME": [], "DATA": [], "DELTAS": [0], "PRICE": 0, "PLIMIT": 20, "STRATEGY": "LR", "LR_SIZE": 9},
     }
 
     # LR - Linear Regresssion
