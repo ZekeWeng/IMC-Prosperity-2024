@@ -3,112 +3,6 @@ from datamodel import Listing, Observation, Order, OrderDepth, ProsperityEncoder
 from typing import Any, List
 import numpy as np
 
-import timeit
-
-class Logger:
-    def __init__(self) -> None:
-        self.logs = ""
-        self.max_log_length = 3750
-
-    def print(self, *objects: Any, sep: str = " ", end: str = "\n") -> None:
-        self.logs += sep.join(map(str, objects)) + end
-
-    def flush(self, state: TradingState, orders: dict[Symbol, list[Order]], conversions: int, trader_data: str) -> None:
-        base_length = len(self.to_json([
-            self.compress_state(state, ""),
-            self.compress_orders(orders),
-            conversions,
-            "",
-            "",
-        ]))
-
-        max_item_length = (self.max_log_length - base_length) // 3
-
-        print(self.to_json([
-            self.compress_state(state, self.truncate(state.traderData, max_item_length)),
-            self.compress_orders(orders),
-            conversions,
-            self.truncate(trader_data, max_item_length),
-            self.truncate(self.logs, max_item_length),
-        ]))
-
-        self.logs = ""
-
-    def compress_state(self, state: TradingState, trader_data: str) -> list[Any]:
-        return [
-            state.timestamp,
-            trader_data,
-            self.compress_listings(state.listings),
-            self.compress_order_depths(state.order_depths),
-            self.compress_trades(state.own_trades),
-            self.compress_trades(state.market_trades),
-            state.position,
-            self.compress_observations(state.observations),
-        ]
-
-    def compress_listings(self, listings: dict[Symbol, Listing]) -> list[list[Any]]:
-        compressed = []
-        for listing in listings.values():
-            compressed.append([listing["symbol"], listing["product"], listing["denomination"]])
-
-        return compressed
-
-    def compress_order_depths(self, order_depths: dict[Symbol, OrderDepth]) -> dict[Symbol, list[Any]]:
-        compressed = {}
-        for symbol, order_depth in order_depths.items():
-            compressed[symbol] = [order_depth.buy_orders, order_depth.sell_orders]
-
-        return compressed
-
-    def compress_trades(self, trades: dict[Symbol, list[Trade]]) -> list[list[Any]]:
-        compressed = []
-        for arr in trades.values():
-            for trade in arr:
-                compressed.append([
-                    trade.symbol,
-                    trade.price,
-                    trade.quantity,
-                    trade.buyer,
-                    trade.seller,
-                    trade.timestamp,
-                ])
-
-        return compressed
-
-    def compress_observations(self, observations: Observation) -> list[Any]:
-        conversion_observations = {}
-        for product, observation in observations.conversionObservations.items():
-            conversion_observations[product] = [
-                observation.bidPrice,
-                observation.askPrice,
-                observation.transportFees,
-                observation.exportTariff,
-                observation.importTariff,
-                observation.sunlight,
-                observation.humidity,
-            ]
-
-        return [observations.plainValueObservations, conversion_observations]
-
-    def compress_orders(self, orders: dict[Symbol, list[Order]]) -> list[list[Any]]:
-        compressed = []
-        for arr in orders.values():
-            for order in arr:
-                compressed.append([order.symbol, order.price, order.quantity])
-
-        return compressed
-
-    def to_json(self, value: Any) -> str:
-        return json.dumps(value, cls=ProsperityEncoder, separators=(",", ":"))
-
-    def truncate(self, value: str, max_length: int) -> str:
-        if len(value) <= max_length:
-            return value
-
-        return value[:max_length - 3] + "..."
-
-logger = Logger()
-
 class Trader:
 
     PRODUCTS = {
@@ -121,8 +15,8 @@ class Trader:
     def run(self, state: TradingState) -> tuple[dict[Symbol, list[Order]], int, str]:
         result = {}
 
-        logger.print("traderData: " + state.traderData)
-        logger.print("Observations: " + str(state.observations))
+        print("traderData: " + state.traderData)
+        print("Observations: " + str(state.observations))
 
         for symbol in state.order_depths:
 
@@ -142,12 +36,6 @@ class Trader:
             if len(self.PRODUCTS[symbol]["TIME"]) > self.PRODUCTS[symbol]["LR_SIZE"]:
                 self.PRODUCTS[symbol]["PRICE"] = self.compute_price_regression(symbol)
 
-            # logger.print(state.position.get(symbol))
-            # print(state.position.get(symbol))
-            # logger.print("Buy Order depth : " + str(len(order_depth.buy_orders)) + ", Sell order depth : " + str(len(order_depth.sell_orders)))
-            # print("Current Strategy: " + str(self.PRODUCTS[symbol]["STRATEGY"]))
-            # print("Current Pred Price: " + str(self.PRODUCTS[symbol]["PRICE"]))
-
             if self.PRODUCTS[symbol]["STRATEGY"] == "LR" and state.timestamp > self.PRODUCTS[symbol]["LR_SIZE"] * 100:
                 ### Buy + Sell Best Price
                 # BUY ORDERS
@@ -162,30 +50,10 @@ class Trader:
                         orders.append(self.submit_order(symbol, bid, bid_amount, state))
                 orders = [x for x in orders if x is not None]
 
-            # if symbol in state.position.keys():
-            #     if state.position[symbol]/self.PRODUCTS[symbol]["PLIMIT"] >= 0.5:
-            #         if len(order_depth.buy_orders) != 0:
-            #             bid, bid_amount = list(order_depth.buy_orders.items())[0]
-            #             if int(bid) > self.PRODUCTS[symbol]["PRICE"] - .75:
-            #                 orders.append(self.submit_order(symbol, bid, bid_amount, state))
-            #     if state.position[symbol]/self.PRODUCTS[symbol]["PLIMIT"] <= -0.5:
-            #         if len(order_depth.sell_orders) != 0:
-            #             ask, ask_amount = list(order_depth.sell_orders.items())[0]
-            #             if int(ask) < self.PRODUCTS[symbol]["PRICE"] + .25:
-            #                 orders.append(self.submit_order(symbol, ask, ask_amount, state))
-
-            #     orders = [x for x in orders if x is not None]
-
-            # if self.PRODUCTS[symbol]["STRATEGY"] == "LR" and state.timestamp > self.PRODUCTS[symbol]["LR_SIZE"] * 100:
-            #     orders.extend(self.execute(symbol, order_depth, state))
-            #     orders = [x for x in orders if x is not None]
-
             result[symbol] = orders
 
         traderData = ""
         conversions = 1
-
-        logger.flush(state, result, conversions, traderData)
 
         return result, conversions, traderData
 
@@ -197,11 +65,11 @@ class Trader:
             can_buy, can_sell = self.PRODUCTS[product]["PLIMIT"], self.PRODUCTS[product]["PLIMIT"]
         if quantity < 0:                                                                            # BUY ORDERS
             order_quantity = min(abs(quantity), can_buy)
-            logger.print("BUY", str(order_quantity) + "x", price)
+            print("BUY", str(order_quantity) + "x", price)
             return Order(product, price, order_quantity)
         if quantity > 0:                                                                            # SELL ORDERS
             order_quantity = min(abs(quantity), can_sell)
-            logger.print("SELL", str(order_quantity) + "x", price)
+            print("SELL", str(order_quantity) + "x", price)
             return Order(product, price, -order_quantity)
 
     def compute_price_regression(self, product):
@@ -222,19 +90,3 @@ class Trader:
         if total_quantity == 0:
             return 0
         return total_value / total_quantity
-
-    # def execute(self, product, order_depth, state):                                                 # SELL EVERYTHING
-    #     orders = []
-    #     for depth in range(0, len(order_depth.buy_orders)):
-    #         bid, bid_amount = list(order_depth.buy_orders.items())[depth]
-    #         if int(bid) > self.PRODUCTS[product]["PRICE"]:
-    #             orders.append(self.submit_order(product, bid, bid_amount, state))
-    #         else:
-    #             break
-    #     for depth in range(0, len(order_depth.sell_orders)):
-    #         ask, ask_amount = list(order_depth.sell_orders.items())[depth]
-    #         if int(ask) < self.PRODUCTS[product]["PRICE"]:
-    #             orders.append(self.submit_order(product, ask, ask_amount, state))
-    #         else:
-    #             break
-    #     return orders
