@@ -4,7 +4,7 @@ Athreya (Dartmouth) \
 Justin (Stanford) \
 Zeke (Toronto)
 
-### Round 1 (4/8/24) - (4/11/24) \
+### Round 1 (4/8/24) - (4/11/24)
 Algo: Attempted [Dynamic LR (std), Hardcoding Fourier Fit, Swing Trading (delta std)]
 Settled on [LR Regression] \
 Pre-round Profits: ("AMETHYSTS": 816, "STARFRUIT": 822} \
@@ -18,16 +18,16 @@ Rank: 816
 
 Notes: Keep Amethysts Trade, Refine Starfruit trade
 
-### Round 2 (4/12/24) - (4/14/24) \
+### Round 2 (4/12/24) - (4/14/24)
 
 Pre-Round Notes:
 ##### ORCHID Trades \
 2500 units / hr => 30000 units = 7 hrs (Seven Hours is meaningless) \
 Regression to predict when Humidity is outside of [60,80] \
-Regression to predict whether whether Sunlight will reach "7 hours" \
+Regression to predict whether whether Sunlight will reach "7 hours"
 
-Short when outside Humidity Range
-Short when CONFIDENT about Sunlight levels not reaching
+Short when outside Humidity Range \
+Short when CONFIDENT about Sunlight levels not reaching \
 Long when CONFIDENT about Sunlight levels reaching
 
 ORCHID ATrades
@@ -35,7 +35,7 @@ ORCHID ATrades
 
 
 
-Algo:
+<!-- Algo:
 Pre-round Profits:
 Post-round Profits:
 
@@ -45,4 +45,4 @@ Post-round Profits:
 Total Profits:
 Rank:
 
-Notes: Keep Amethysts Trade, Refine Starfruit trade
+Notes: Keep Amethysts Trade, Refine Starfruit trade -->
